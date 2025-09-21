@@ -28,23 +28,19 @@ void line(int x1, int y1, int x2, int y2, uint32_t color) {
     }
 }
 
-/* Replace your arc() with this */
-void arc(int start_x, int start_y, float angle_deg, float velocity, uint32_t color) {
+/* Replace your trajectory() with this */
+void trajectory(int start_x, int start_y, float angle_deg, float velocity, uint32_t color) {
     float g = 9.81f; // Acceleration due to gravity
     float dt = 0.01f; // Time step
     float angle_rad = angle_deg * (M_PI / 180.0f); // Convert angle to radians
     float vx = velocity * cosf(angle_rad); // Initial horizontal velocity
     float vy = velocity * sinf(angle_rad); // Initial vertical velocity
     float fx = start_x, fy = start_y; // Current position
-    float previousX = fx;
-    float previousY = fy;
     for (float t = 0; t < (2*velocity*sinf(angle_rad)/g); t += dt) {
+        pixel((int)lroundf(fx), (int)lroundf(fy), color);
         fx += vx*dt;
         fy -= vy*dt; // Subtract because y increases downwards
         vy -= g*dt; // Update vertical velocity
-        line((int)roundf(previousX), (int)roundf(previousY), (int)roundf(fx), (int)roundf(fy), color);
-        previousX = fx;
-        previousY = fy;
     }
 }
 char font8x8_basic[128][8] = {
@@ -239,7 +235,7 @@ int main() {
     //int thingy = 1/0;
     float angle = 45.5f;
     float velocity = 60.0f;
-    float thing = 1.0f;
+    float thing = 0.5f;
     while (1) {
         XEvent e;
         while (XPending(dpy)) {
@@ -252,14 +248,16 @@ int main() {
             }
         }
         // draw something into framebuffer32 here
-        // we will draw an arc, based on launch angle and velocity
+        // we will draw an trajectory, based on launch angle and velocity
         angle += thing;
-        if (angle > 89.0f) thing = -1.0f;
-        if (angle < 1.0f) thing = 1.0f;
-        arc(30,240,angle, 60.0f, 0xFFFFFF); // Red arc
+        //trajectory(360,360,90+angle,60.0f,0xFFFFFF);
+        
+        if (angle > 89.0f) thing = -0.5f;
+        if (angle < 1.0f) thing = 0.5f;
+        trajectory(30,240,angle, 60.0f, 0xFFFFFF); // Red trajectory
         print("Angle change (1 to 89)", 0xffffff, 30, 100);
         velocity += thing;
-        arc(30,360,45.5f, velocity, 0x00FF00); // Green arc
+        trajectory(30,360,45.5f, velocity, 0x00FF00); // Green trajectory
         print("Velocity change (60 to like 105)", 0xffffff, 30, 400);
         
         // copy converted pixels into XImage memory and blit
@@ -267,7 +265,7 @@ int main() {
         memcpy(ximage->data, framebuffer32, WIDTH * HEIGHT * 4);
         XPutImage(dpy, win, gc, ximage, 0, 0, 0, 0, WIDTH, HEIGHT);
 
-        usleep(100000); // ~60 FPS
+        usleep(50000); // ~60 FPS
     }
 
 cleanup:

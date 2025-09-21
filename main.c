@@ -30,43 +30,21 @@ void line(int x1, int y1, int x2, int y2, uint32_t color) {
 
 /* Replace your arc() with this */
 void arc(int start_x, int start_y, float angle_deg, float velocity, uint32_t color) {
-    const float g = 9.81f;
-    const float dt = 0.01f;                     // consistent timestep
-    const float rad = angle_deg * (M_PI / 180.0f);
-
-    float velx = velocity * cosf(rad);
-    float vely = velocity * sinf(rad);
-
-    /* use floats for position so small increments are preserved */
-    float fx = (float)start_x;
-    float fy = (float)start_y;
-
-    /* total flight time (seconds) */
-    float t_end = (2.0f * velocity * sinf(rad)) / g;
-    if (t_end < 0.0f) t_end = 0.0f;
-
-    /* draw until time runs out OR projectile leaves the screen */
-    float prev_fx = fx, prev_fy = fy;
-    for (float t = 0.0f; t <= t_end; t += dt) {
-        /* advance position by vel * dt */
-        fx += velx * dt;
-        fy -= vely * dt;      /* screen y grows downward — you subtract vely */
-
-        /* draw a segment from previous float pos to current */
-        int x1 = (int)roundf(prev_fx);
-        int y1 = (int)roundf(prev_fy);
-        int x2 = (int)roundf(fx);
-        int y2 = (int)roundf(fy);
-        line(x1, y1, x2, y2, color);
-
-        /* update vertical velocity with gravity using same dt */
-        vely -= g * dt;
-
-        /* update prev */
-        prev_fx = fx; prev_fy = fy;
-
-        /* stop if completely off-screen */
-        if (x2 < 0 || x2 >= WIDTH || y2 < 0 || y2 >= HEIGHT) break;
+    float g = 9.81f; // Acceleration due to gravity
+    float dt = 0.01f; // Time step
+    float angle_rad = angle_deg * (M_PI / 180.0f); // Convert angle to radians
+    float vx = velocity * cosf(angle_rad); // Initial horizontal velocity
+    float vy = velocity * sinf(angle_rad); // Initial vertical velocity
+    float fx = start_x, fy = start_y; // Current position
+    float previousX = fx;
+    float previousY = fy;
+    for (float t = 0; t < (2*velocity*sinf(angle_rad)/g); t += dt) {
+        fx += vx*dt;
+        fy -= vy*dt; // Subtract because y increases downwards
+        vy -= g*dt; // Update vertical velocity
+        line((int)roundf(previousX), (int)roundf(previousY), (int)roundf(fx), (int)roundf(fy), color);
+        previousX = fx;
+        previousY = fy;
     }
 }
 char font8x8_basic[128][8] = {

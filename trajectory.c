@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 #define WIDTH 640
 #define HEIGHT 480
 
@@ -29,20 +30,34 @@ void line(int x1, int y1, int x2, int y2, uint32_t color) {
 }
 
 /* Replace your trajectory() with this */
-void trajectory(int start_x, int start_y, float angle_deg, float velocity, uint32_t color) {
-    float g = 9.81f; // Acceleration due to gravity
-    float dt = 0.01f; // Time step
-    float angle_rad = angle_deg * (M_PI / 180.0f); // Convert angle to radians
-    float vx = velocity * cosf(angle_rad); // Initial horizontal velocity
-    float vy = velocity * sinf(angle_rad); // Initial vertical velocity
-    float fx = start_x, fy = start_y; // Current position
-    for (float t = 0; t < (2*velocity*sinf(angle_rad)/g); t += dt) {
-        pixel((int)lroundf(fx), (int)lroundf(fy), color);
-        fx += vx*dt;
-        fy -= vy*dt; // Subtract because y increases downwards
-        vy -= g*dt; // Update vertical velocity
+void trajectory(int start_x, int start_y, float angle_deg,
+                float velocity_mps, uint32_t color)
+{
+    const float g = 9.81f;          
+    const float dt = 0.001f;        // smaller step = more points
+    const float scale = 125.0f;     
+
+    float angle = angle_deg * (M_PI / 180.0f);
+    float vx = velocity_mps * cosf(angle);
+    float vy = velocity_mps * sinf(angle);
+
+    float x_m = 0.0f;
+    float y_m = 0.0f;
+
+    float t_end = 2.0f * velocity_mps * sinf(angle) / g;
+
+    for (float t = 0; t <= t_end; t += dt) {
+        int px = start_x + (int)lroundf(x_m * scale);
+        int py = start_y - (int)lroundf(y_m * scale);
+        pixel(px, py, color);
+
+        x_m += vx * dt;
+        y_m += vy * dt;
+        vy  -= g  * dt;
     }
 }
+
+
 char font8x8_basic[128][8] = {
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},   // U+0000 (nul)
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},   // U+0001
@@ -234,13 +249,15 @@ int main() {
     if (!ximage || !ximage->data) return 1;
     //int thingy = 1/0;
     float angle = 45.5f;
-    float velocity = 60.0f;
+    float velocity = 6.0f;
     float thing = 0.5f;
+    float thing2 = 0.05f;
+    bool spaced = false;
     while (1) {
         XEvent e;
         while (XPending(dpy)) {
             XNextEvent(dpy, &e);
-            if (e.type == KeyPress) goto cleanup;
+            if (e.type == KeyPress) spaced = !spaced;
         }
         for (int y = 0; y < HEIGHT; y++) {
             for (int x = 0; x < WIDTH; x++) {
@@ -249,14 +266,20 @@ int main() {
         }
         // draw something into framebuffer32 here
         // we will draw an trajectory, based on launch angle and velocity
+        if (!spaced) {
         angle += thing;
+        velocity += thing2;
+        }
         //trajectory(360,360,90+angle,60.0f,0xFFFFFF);
-        
-        if (angle > 89.0f) thing = -0.5f;
-        if (angle < 1.0f) thing = 0.5f;
-        trajectory(30,240,angle, 60.0f, 0xFFFFFF); // Red trajectory
+        line(320,30,320+125,30,0xffffff);
+        line(320,30,320,30+125,0xffffff);
+        print("One meter", 0xffffff, 334, 34);
+        if (angle > 89.0f) { thing = -0.5f; thing2 = -0.05f;}
+        if (angle < 1.0f) { thing = 0.5f; thing2 = 0.05f;}
+
+        //if (velocity <= 1.5f) { velocity = 1.5f;}
+        trajectory(30,240,angle, 6.0f, 0xFFFFFF); // Red trajectory
         print("Angle change (1 to 89)", 0xffffff, 30, 100);
-        velocity += thing;
         trajectory(30,360,45.5f, velocity, 0x00FF00); // Green trajectory
         print("Velocity change (60 to like 105)", 0xffffff, 30, 400);
         

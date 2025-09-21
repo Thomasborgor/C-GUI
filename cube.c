@@ -1,4 +1,4 @@
-#include <X11/Xlib.h>
+#include <X11/Xlib.h> //includes for every library
 #include <X11/Xutil.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,16 +8,16 @@
 #include <string.h>
 #include <stdio.h>
 
-#define WIDTH 640
+#define WIDTH 640 //define the screen size
 #define HEIGHT 480
 
-uint16_t framebuffer[WIDTH * HEIGHT];
-uint32_t framebuffer32[WIDTH * HEIGHT];
+uint16_t framebuffer[WIDTH * HEIGHT]; //16 bit framebuffer, early testing stuff
+uint32_t framebuffer32[WIDTH * HEIGHT]; //what x11 wants
 
-typedef struct { float x, y, z, w; } vec4;
-typedef struct { float m[4][4]; } mat4;
+typedef struct { float x, y, z, w; } vec4; //3d point class kind of, w is a placeholder for fast 4x4 matrix multiplication
+typedef struct { float m[4][4]; } mat4; //this is for rotation multiplictation and stuff
 
-static inline void putPixelRGB565_indexed(int idx, uint32_t color) {
+static inline void putPixelRGB565_indexed(int idx, uint32_t color) { //code to put a pixel in the 16 bit buffer
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >> 8) & 0xFF;
     uint8_t b =  color        & 0xFF;
@@ -29,10 +29,10 @@ static inline void putPixelRGB565_indexed(int idx, uint32_t color) {
 
 void drawPixel(int x, int y, uint32_t color) {
     if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return;
-    putPixelRGB565_indexed(y * WIDTH + x, color);
+    putPixelRGB565_indexed(y * WIDTH + x, color); //idk some stupid code
 }
 
-void clearScreen(uint32_t color) {
+void clearScreen(uint32_t color) { //clears the screen a certain color
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >> 8) & 0xFF;
     uint8_t b =  color        & 0xFF;
@@ -43,7 +43,7 @@ void clearScreen(uint32_t color) {
     for (int i = 0; i < WIDTH * HEIGHT; i++) framebuffer[i] = packed;
 }
 
-void convert_to_ximage() {
+void convert_to_ximage() { //converts 16 bit framebuffer to 32 bit
     for (int i = 0; i < WIDTH * HEIGHT; i++) {
         uint16_t c = framebuffer[i];
         uint8_t r5 = (c >> 11) & 0x1F;
@@ -56,7 +56,7 @@ void convert_to_ximage() {
     }
 }
 
-mat4 mul_mat4(mat4 a, mat4 b) {
+mat4 mul_mat4(mat4 a, mat4 b) { //fast 4x4 matrix multiplication
     mat4 r;
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++)
@@ -65,7 +65,7 @@ mat4 mul_mat4(mat4 a, mat4 b) {
     return r;
 }
 
-vec4 mul_vec4_mat4(vec4 v, mat4 m) {
+vec4 mul_vec4_mat4(vec4 v, mat4 m) { //for multiplying the rotation matrix to a traingles point
     vec4 r;
     r.x = v.x*m.m[0][0] + v.y*m.m[1][0] + v.z*m.m[2][0] + v.w*m.m[3][0];
     r.y = v.x*m.m[0][1] + v.y*m.m[1][1] + v.z*m.m[2][1] + v.w*m.m[3][1];
@@ -74,7 +74,7 @@ vec4 mul_vec4_mat4(vec4 v, mat4 m) {
     return r;
 }
 
-static void drawLine(int x0,int y0,int x1,int y1,uint32_t color){
+static void drawLine(int x0,int y0,int x1,int y1,uint32_t color){ //draws line using bresenham's line algorithm
     int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     int err = dx + dy, e2;
@@ -87,9 +87,9 @@ static void drawLine(int x0,int y0,int x1,int y1,uint32_t color){
     }
 }
 
-void drawTriangle(vec4 v0, vec4 v1, vec4 v2, uint32_t color) {
+void drawTriangle(vec4 v0, vec4 v1, vec4 v2, uint32_t color) { //draws a triangle, does simple perspective projection
     if (v0.z <= 0 || v1.z <= 0 || v2.z <= 0) return;
-    float s = 200.0f;
+    float s = 300.0f;
     int x0 = (int)(WIDTH/2 + (v0.x / v0.z) * s);
     int y0 = (int)(HEIGHT/2 - (v0.y / v0.z) * s);
     int x1 = (int)(WIDTH/2 + (v1.x / v1.z) * s);

@@ -30,32 +30,63 @@ void line(int x1, int y1, int x2, int y2, uint32_t color) {
 }
 
 /* Replace your trajectory() with this */
+void calcTrajec(int x0, int y0,
+                int xa, int ya,
+                uint32_t color,
+                float *vel,
+                float *angle)
+{
+    const float g     = 9.81f;
+    const float scale = 125.0f;   // 125 px = 1 m
+
+    // pixel deltas → meters, flip Y (screen Y grows downward)
+    float dx = (xa - x0) / scale;
+    float dy = (y0 - ya) / scale;
+
+    if (dx <= 0.0f || dy <= 0.0f) {
+        // apex must be higher and to the right
+        *vel = 0.0f;
+        *angle = 0.0f;
+        return;
+    }
+
+    float theta = atanf((2.0f * dy) / dx);      // radians
+    *angle = theta * (180.0f / (float)M_PI);    // degrees
+
+    float s = sinf(theta);
+    *vel = sqrtf((2.0f * g * dy) / (s * s));
+}
+
 void trajectory(int start_x, int start_y, float angle_deg,
                 float velocity_mps, uint32_t color)
 {
-    const float g = 9.81f;          
-    const float dt = 0.001f;        // smaller step = more points
-    const float scale = 125.0f;     
+    const float g = 9.81f;
+    const float dt = 0.01f;        // adjust for quality/perf (0.001 very expensive)
+    const float scale = 125.0f;    // same scale used in calcTrajec
 
-    float angle = angle_deg * (M_PI / 180.0f);
+    float angle = angle_deg * (M_PI / 180.0f); // convert degrees -> radians
     float vx = velocity_mps * cosf(angle);
     float vy = velocity_mps * sinf(angle);
+    float prevx = start_x;
+    float prevy = start_y;
 
-    float x_m = 0.0f;
-    float y_m = 0.0f;
+    // time of flight (apex at t = vy/g, full flight t_end = 2*vy/g)
+    float t_end = 2.0f * vy / g;
+    if (t_end <= 0.0f) return;
 
-    float t_end = 2.0f * velocity_mps * sinf(angle) / g;
-
-    for (float t = 0; t <= t_end; t += dt) {
+    // Draw using closed-form kinematics to avoid accumulation drift:
+    for (float t = 0.0f; t <= t_end; t += dt) {
+        float x_m = vx * t;
+        float y_m = vy * t - 0.5f * g * t * t;
         int px = start_x + (int)lroundf(x_m * scale);
         int py = start_y - (int)lroundf(y_m * scale);
-        pixel(px, py, color);
-
-        x_m += vx * dt;
-        y_m += vy * dt;
-        vy  -= g  * dt;
+        line(prevx, prevy, px, py, color);
+        prevx = px;
+        prevy = py;
     }
 }
+
+
 
 
 char font8x8_basic[128][8] = {
@@ -238,7 +269,9 @@ int main() {
                                      0, 0, WIDTH, HEIGHT, 1,
                                      BlackPixel(dpy, screen),
                                      WhitePixel(dpy, screen));
-    XSelectInput(dpy, win, ExposureMask | KeyPressMask);
+    XSelectInput(dpy, win,
+    KeyPressMask | ButtonPressMask | ExposureMask | PointerMotionMask);
+
     XMapWindow(dpy, win);
     GC gc = DefaultGC(dpy, screen);
 
@@ -253,19 +286,39 @@ int main() {
     float thing = 0.5f;
     float thing2 = 0.05f;
     bool spaced = false;
+    float vel;
+    float ang;
     while (1) {
         XEvent e;
         while (XPending(dpy)) {
             XNextEvent(dpy, &e);
             if (e.type == KeyPress) spaced = !spaced;
+
+            if (e.type == ButtonPress) {
+                //printf("%d, %d\n", e.xbutton.x, e.xbutton.y);
+                
+                calcTrajec(30, 360, e.xbutton.x, e.xbutton.y, 0xffffff, &vel, &ang);
+            }
         }
+
+        
         for (int y = 0; y < HEIGHT; y++) {
             for (int x = 0; x < WIDTH; x++) {
                 framebuffer32[y * WIDTH + x] = 0;
             }
         }
+
+        trajectory(30, 360, ang, vel, 0xffffff);
+        char str[16];   
+        snprintf(str, sizeof(str), "Angle: %.2f", ang);
+        print(str, 0xffffff,30, 30);
+        snprintf(str, sizeof(str), "Velocity: %.2f", vel);
+        print(str, 0xffffff, 30, 40);
+        //line(30,240,angle, 6.0f, 0xffffff);
+        
         // draw something into framebuffer32 here
         // we will draw an trajectory, based on launch angle and velocity
+        
         if (!spaced) {
         angle += thing;
         velocity += thing2;
@@ -285,10 +338,12 @@ int main() {
         
         // copy converted pixels into XImage memory and blit
         //convert_to_ximage();
+        
+        
         memcpy(ximage->data, framebuffer32, WIDTH * HEIGHT * 4);
         XPutImage(dpy, win, gc, ximage, 0, 0, 0, 0, WIDTH, HEIGHT);
 
-        usleep(50000); // ~60 FPS
+        usleep(50000); // ~60 FPS 
     }
 
 cleanup:
